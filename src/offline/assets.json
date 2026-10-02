@@ -1,0 +1,11 @@
+[
+  { "id": "sense/model.int8.onnx", "engine": "asr", "repo": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17", "revision": "2365baeacb507f821a0c8120fcee3d484dba7a07", "file": "model.int8.onnx", "size": 239233841, "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51" },
+  { "id": "sense/tokens.txt", "engine": "asr", "repo": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17", "revision": "2365baeacb507f821a0c8120fcee3d484dba7a07", "file": "tokens.txt", "size": 315894, "sha256": null },
+  { "id": "m2m/config.json", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "config.json", "size": 908, "sha256": null },
+  { "id": "m2m/generation_config.json", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "generation_config.json", "size": 233, "sha256": null },
+  { "id": "m2m/tokenizer_config.json", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "tokenizer_config.json", "size": 1813, "sha256": null },
+  { "id": "m2m/tokenizer.json", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "tokenizer.json", "size": 7988527, "sha256": null },
+  { "id": "m2m/special_tokens_map.json", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "special_tokens_map.json", "size": 1559, "sha256": null },
+  { "id": "m2m/onnx/encoder_model_quantized.onnx", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "onnx/encoder_model_quantized.onnx", "size": 287856370, "sha256": "13a94e354a9140764eb81102d77d3ec6952d796e6f113c651eeb3c3443da0386" },
+  { "id": "m2m/onnx/decoder_model_merged_quantized.onnx", "engine": "translation", "repo": "Xenova/m2m100_418M", "revision": "9c374f0b7aca709787cea97b047bfbbd1559d177", "file": "onnx/decoder_model_merged_quantized.onnx", "size": 344128178, "sha256": "007654bcabb6cea6fd3bde34ce933137b431330b3755781145d7b6906270b45a" }
+]

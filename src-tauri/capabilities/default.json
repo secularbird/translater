@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Sonora main window and native microphone access",
+  "windows": ["main"],
+  "permissions": ["core:default", "microphone:default"]
+}

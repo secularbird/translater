@@ -1,0 +1,11 @@
+[package]
+name = "tauri-plugin-microphone"
+version = "0.1.0"
+edition = "2021"
+links = "tauri-plugin-microphone"
+
+[dependencies]
+tauri = { version = "2" }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

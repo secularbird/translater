@@ -1,0 +1,3 @@
+[default]
+description = "Microphone permission, foreground capture, and PCM event subscriptions."
+permissions = ["allow-start", "allow-stop", "allow-status", "allow-insets", "allow-check-permissions", "allow-request-permissions", "allow-register-listener", "allow-remove-listener"]
