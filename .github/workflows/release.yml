@@ -115,11 +115,14 @@ jobs:
       - uses: ./.github/actions/setup-project
         with:
           runtime-artifact: wasm-runtime
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: 'false'
       - name: Android SDK and 16KB-compatible NDK
         run: |
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
