@@ -2,6 +2,12 @@
 
 一个基于 **Tauri 2 + React + TypeScript + Rust** 的实时语音翻译应用，面向 macOS、Windows、Linux、Android 和 iOS。
 
+[![CI](https://github.com/secularbird/translater/actions/workflows/ci.yml/badge.svg)](https://github.com/secularbird/translater/actions/workflows/ci.yml)
+
+[下载发布版本](https://github.com/secularbird/translater/releases) · [自动构建与签名说明](docs/RELEASING.md)
+
+GitHub Actions提供Windows x64、macOS Apple Silicon/Intel、Android ARM64及iOS模拟器构建。iPhone可安装IPA需要额外Apple签名资料，不能用模拟器包替代。
+
 自然说话 → Silero VAD 判断语音起止 → 语音识别 / 语言检测 → 完整句翻译 → 译文流式显示。
 
 ## 已实现

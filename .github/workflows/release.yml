@@ -1,0 +1,236 @@
+name: Release
+run-name: Build ${{ inputs.tag || github.ref_name }}${{ inputs.publish && ' and publish' || '' }}
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag matching package.json, e.g. v0.1.0
+        required: true
+        default: v0.1.0
+      publish:
+        description: Publish the completed artifacts to GitHub Releases
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+      - run: python scripts/ci/artifacts.py version --tag "$RELEASE_TAG"
+      - uses: actions/cache@v4
+        with:
+          path: .model-cache/*.tar.bz2
+          key: sherpa-runtime-${{ hashFiles('scripts/prepare_sherpa.py') }}
+      - run: npm run models:setup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-runtime
+          path: public/wasm
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    needs: runtime
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            platform: windows
+            target: x86_64-pc-windows-msvc
+          - runner: macos-15
+            platform: macos
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            platform: macos
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with:
+          runtime-artifact: wasm-runtime
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release-${{ matrix.target }}
+      - name: Build Windows installers
+        if: matrix.platform == 'windows'
+        run: npm run tauri -- build --ci --target '${{ matrix.target }}' --bundles nsis,msi
+      - name: Build macOS app and DMG
+        id: apple
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: python scripts/ci/build_apple.py macos --target '${{ matrix.target }}'
+      - name: Collect packages
+        env:
+          SIGNING: ${{ steps.apple.outputs.signing || 'unsigned' }}
+        run: python scripts/ci/artifacts.py '${{ matrix.platform }}' --target '${{ matrix.target }}' --tag "$RELEASE_TAG" --signing "$SIGNING"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: release-artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+  android:
+    needs: runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with:
+          runtime-artifact: wasm-runtime
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Android SDK and 16KB-compatible NDK
+        run: |
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release-android-arm64
+      - run: npm run tauri -- android init --ci --skip-targets-install
+      - name: Configure fixed release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: python scripts/ci/android_signing.py configure
+      - name: Build signed APK and AAB
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: npm run tauri -- android build --target aarch64 --apk --aab --ci
+      - run: python scripts/ci/artifacts.py android --tag "$RELEASE_TAG" --signing signed
+      - name: Verify APK signature
+        run: '"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs release-artifacts/*.apk'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-android-arm64
+          path: release-artifacts
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/sonora-signing"
+
+  ios:
+    needs: runtime
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with:
+          runtime-artifact: wasm-runtime
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release-ios
+      - name: Show available Apple SDKs
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list runtimes
+      - run: npm run tauri -- ios init --ci --skip-targets-install
+      - run: python scripts/ci/build_apple.py ios-simulator
+      - id: simulator
+        run: python scripts/ci/artifacts.py ios-simulator --tag "$RELEASE_TAG" --signing simulator-only
+      - name: Install and launch on iOS simulator
+        env:
+          SIMULATOR_APP: ${{ steps.simulator.outputs.app }}
+        run: python scripts/ci/ios_smoke.py "$SIMULATOR_APP"
+      - name: Export signed iPhone IPA when credentials are configured
+        id: device
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
+          IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD || 'release-testing' }}
+        run: python scripts/ci/build_apple.py ios-device
+      - name: Collect IPA
+        if: steps.device.outputs.built == 'true'
+        env:
+          IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD || 'release-testing' }}
+        run: python scripts/ci/artifacts.py ios-device --tag "$RELEASE_TAG" --signing signed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-ios
+          path: release-artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [verify, desktop, android, ios]
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: release-artifacts
+          merge-multiple: true
+      - name: Validate and publish completed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci/publish.py --tag "$RELEASE_TAG"

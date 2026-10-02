@@ -1,0 +1,23 @@
+name: Set up Sonora frontend and runtime
+description: Install pinned dependencies and optionally restore the prepared offline runtime.
+inputs:
+  runtime-artifact:
+    description: Name of the WASM artifact prepared in this workflow
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    - run: npm ci
+      shell: bash
+    - uses: actions/download-artifact@v4
+      if: inputs.runtime-artifact != ''
+      with:
+        name: ${{ inputs.runtime-artifact }}
+        path: public/wasm

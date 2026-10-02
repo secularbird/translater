@@ -41,3 +41,7 @@ public/wasm/
 *.pem
 *.key
 *.mobileprovision
+.release-keys/
+.release-staging/
+release-artifacts/
+*.xcresult/
